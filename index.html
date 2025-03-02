@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Life Coach AI - 你的AI生活教练</title>
+    <style>
+        /* 全局样式 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            line-height: 1.6;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+
+        /* 页面布局 */
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 顶部标题 */
+        header {
+            text-align: center;
+            padding: 20px 0;
+            margin-bottom: 20px;
+        }
+
+        header h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+
+        header p {
+            color: #7f8c8d;
+        }
+
+        /* 聊天区域 */
+        .chat-container {
+            flex: 1;
+            background: #fff;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* 聊天记录 */
+        .chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            max-height: 60vh;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .message.user {
+            flex-direction: row-reverse;
+        }
+
+        .message-content {
+            max-width: 70%;
+            padding: 12px 16px;
+            border-radius: 15px;
+            margin: 0 10px;
+        }
+
+        .user .message-content {
+            background: #007AFF;
+            color: white;
+            border-top-right-radius: 5px;
+        }
+
+        .ai .message-content {
+            background: #E9ECEF;
+            color: #333;
+            border-top-left-radius: 5px;
+        }
+
+        /* 输入区域 */
+        .input-container {
+            padding: 20px;
+            background: #fff;
+            border-top: 1px solid #eee;
+            display: flex;
+            gap: 10px;
+        }
+
+        #message-input {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 25px;
+            outline: none;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        #message-input:focus {
+            border-color: #007AFF;
+        }
+
+        #send-button {
+            padding: 12px 24px;
+            background: #007AFF;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+
+        #send-button:hover {
+            background: #0056b3;
+        }
+
+        #send-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        /* 底部版权信息 */
+        footer {
+            text-align: center;
+            padding: 20px 0;
+            color: #7f8c8d;
+            font-size: 14px;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 600px) {
+            .container {
+                padding: 10px;
+            }
+
+            .message-content {
+                max-width: 85%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Life Coach AI</h1>
+            <p>你的专属AI生活教练，随时为你提供建议与指导</p>
+        </header>
+
+        <div class="chat-container">
+            <div class="chat-messages" id="chat-messages">
+                <!-- 消息将通过JavaScript动态添加 -->
+            </div>
+
+            <div class="input-container">
+                <input type="text" id="message-input" placeholder="输入你的问题..." autocomplete="off">
+                <button id="send-button">发送</button>
+            </div>
+        </div>
+
+        <footer>
+            <p>&copy; 2024 Life Coach AI. All rights reserved.</p>
+        </footer>
+    </div>
+
+    <script>
+        // 获取DOM元素
+        const chatMessages = document.getElementById('chat-messages');
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+
+        // 添加消息到聊天界面
+        function addMessage(content, isUser = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user' : 'ai'}`;
+            messageDiv.innerHTML = `
+                <div class="message-content">${content}</div>
+            `;
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // 发送消息
+        async function sendMessage() {
+            const message = messageInput.value.trim();
+            if (!message) return;
+
+            // 禁用输入和按钮
+            messageInput.disabled = true;
+            sendButton.disabled = true;
+
+            // 显示用户消息
+            addMessage(message, true);
+            messageInput.value = '';
+
+            try {
+                // 发送请求到后端
+                const response = await fetch('http://localhost:3000/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ message })
+                });
+
+                if (!response.ok) throw new Error('网络请求失败');
+
+                // 处理流式响应
+                const reader = response.body.getReader();
+                let aiResponse = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    // 将二进制数据转换为文本
+                    const chunk = new TextDecoder().decode(value);
+                    aiResponse += chunk;
+
+                    // 更新AI回复
+                    const lastMessage = chatMessages.lastElementChild;
+                    if (lastMessage && lastMessage.classList.contains('ai')) {
+                        lastMessage.querySelector('.message-content').textContent = aiResponse;
+                    } else {
+                        addMessage(aiResponse);
+                    }
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                addMessage('抱歉，发生了错误，请稍后重试。');
+            } finally {
+                // 恢复输入和按钮
+                messageInput.disabled = false;
+                sendButton.disabled = false;
+                messageInput.focus();
+            }
+        }
+
+        // 事件监听
+        sendButton.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+
+        // 添加欢迎消息
+        addMessage('你好！我是你的AI生活教练。让我们开始对话吧，分享你的想法或困扰，我会为你提供建议和指导。');
+    </script>
+</body>
+</html>
